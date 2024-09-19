@@ -1,5 +1,9 @@
+mod parser;
+mod scanner;
 mod token;
 
+use crate::parser::Parser;
+use crate::scanner::Scanner;
 use crate::token::Token;
 use std::{fs, io, process};
 
@@ -62,5 +66,12 @@ pub fn run_file(path: &str) {
 }
 
 fn run(source: String) {
-    println!("Run");
+    let mut tokens: Vec<Token> = Vec::new();
+    let mut scanner = Scanner::new(source, &mut tokens);
+    scanner.scan_tokens();
+    let mut parser = Parser::new(&mut tokens);
+
+    for token in tokens {
+        println!("{}", token);
+    }
 }
