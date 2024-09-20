@@ -7,11 +7,11 @@ use crate::token::Literal;
 pub struct RpnNotation {}
 
 impl RpnNotation {
-    pub fn print(&self, expr: &Expr) -> String {
+    pub fn print(&mut self, expr: &Expr) -> String {
         self.visit_expr(expr)
     }
 
-    fn format(&self, name: &str, exprs: Vec<&Expr>) -> String {
+    fn format(&mut self, name: &str, exprs: Vec<&Expr>) -> String {
         let mut string = String::new();
         for expr in exprs {
             string.push_str(&self.visit_expr(expr));
@@ -23,7 +23,7 @@ impl RpnNotation {
 }
 
 impl expr::Visitor<String> for RpnNotation {
-    fn visit_expr(&self, expr: &Expr) -> String {
+    fn visit_expr(&mut self, expr: &Expr) -> String {
         match expr {
             Expr::Literal { value } => match value {
                 Literal::String(v) => v.to_string(),

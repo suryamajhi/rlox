@@ -5,11 +5,11 @@ use crate::token::Literal;
 pub struct AstPrinter {}
 
 impl AstPrinter {
-    pub fn print(&self, expr: &Expr) -> String {
+    pub fn print(&mut self, expr: &Expr) -> String {
         self.visit_expr(expr)
     }
 
-    fn parenthesize(&self, name: &str, exprs: Vec<&Expr>) -> String {
+    fn parenthesize(&mut self, name: &str, exprs: Vec<&Expr>) -> String {
         let mut string = String::from("(");
         string.push_str(name);
 
@@ -23,7 +23,7 @@ impl AstPrinter {
 }
 
 impl expr::Visitor<String> for AstPrinter {
-    fn visit_expr(&self, expr: &Expr) -> String {
+    fn visit_expr(&mut self, expr: &Expr) -> String {
         match expr {
             Expr::Literal { value } => match value {
                 Literal::String(value) => value.to_string(),

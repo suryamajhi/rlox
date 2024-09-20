@@ -1,7 +1,7 @@
 use crate::token::{Literal, Token};
 
 pub trait Visitor<T> {
-    fn visit_expr(&self, expr: &Expr) -> T;
+    fn visit_expr(&mut self, expr: &Expr) -> T;
 }
 
 #[derive(Debug)]

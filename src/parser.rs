@@ -1,3 +1,4 @@
+use std::process;
 use crate::expr::Expr;
 use crate::print_error;
 use crate::stmt::Stmt;
@@ -23,7 +24,9 @@ impl<'a> Parser<'a> {
         let mut statements = Vec::new();
         while !self.is_at_end() {
             match self.declaration() {
-                None => {},
+                None => {
+                    self.synchronize();
+                },
                 Some(stmt) => statements.push(stmt)
             }
         }
@@ -31,14 +34,55 @@ impl<'a> Parser<'a> {
     }
 
     fn declaration(&mut self) -> Option<Stmt> {
-        let res = self.statement();
+        let res;
+        if self.match_token(vec![VAR]) {
+            res = self.var_declaration();
+        } else if self.match_token(vec![LEFT_BRACE]) {
+            res = Ok(Stmt::Block(self.block()))
+        } else {
+            res = self.statement();
+        }
         match res {
             Ok(stmt) => Some(stmt),
-            Err(_) => {
-                self.synchronize();
-                None
+            Err(_) => None
+        }
+    }
+
+    fn block(&mut self) -> Vec<Stmt> {
+        let mut statements = Vec::new();
+        while !self.check(&RIGHT_BRACE) && !self.is_at_end() {
+            match self.declaration() {
+                None => {
+                    process::exit(65);
+                }
+                Some(stmt) => statements.push(stmt)
             }
         }
+        match self.consume(RIGHT_BRACE, "Expect '}'.") {
+            Ok(_) => {}
+            Err(err) => process::exit(65),
+        };
+        statements
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume(IDENTIFIER, "Expect variable name")?.clone();
+
+        let mut initializer = None;
+        if self.match_token(vec![EQUAL]) {
+            match self.expression() {
+                Ok(expr) => {
+                    initializer = Some(expr);
+                }
+                Err(_) => {}
+            }
+        }
+
+        self.consume(SEMICOLON, "Expect ';' after variable declaration")?;
+        Ok(Stmt::Var {
+            name,
+            initializer
+        })
     }
 
     fn statement(&mut self) -> Result<Stmt> {
@@ -61,11 +105,24 @@ impl<'a> Parser<'a> {
     }
 
     pub fn expression(&mut self) -> Result<Expr> {
-        self.equality()
+        self.assignment()
     }
 
     fn assignment(&mut self) -> Result<Expr> {
-        Err(ParseError)
+        let expr = self.equality()?;
+        if self.match_token(vec![EQUAL]) {
+            let equals = self.previous().clone();
+            let value = self.assignment()?;
+
+            if let Expr::Var {name} = expr {
+                return Ok(Expr::Assign {
+                    name,
+                    expr: Box::new(value)
+                })
+            }
+            return Err(self.error(&equals, "Invalid assignment target"));
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr> {
@@ -161,6 +218,11 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal {
                 value: self.previous().literal.clone(),
             });
+        }
+        if self.match_token(vec![IDENTIFIER]) {
+            return Ok(Expr::Var {
+                name: self.previous().clone(),
+            })
         }
         if self.match_token(vec![TokenType::LEFT_PAREN]) {
             let expr = self.expression()?;

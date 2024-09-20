@@ -14,6 +14,7 @@ mod token;
 mod utils;
 mod value;
 mod stmt;
+mod environment;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 
@@ -98,6 +99,6 @@ fn run(source: String) {
     }
     let mut parser = Parser::new(&mut tokens);
     let stmts: Vec<Stmt> = parser.parse();
-    let interpreter = Interpreter::new();
+    let mut interpreter = Interpreter::new();
     interpreter.interpret(&stmts);
 }
