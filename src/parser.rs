@@ -33,7 +33,7 @@ impl<'a> Parser<'a> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator,
-                right: Box::new(right)
+                right: Box::new(right),
             }
         }
         Ok(expr)
@@ -52,7 +52,7 @@ impl<'a> Parser<'a> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator,
-                right: Box::new(right)
+                right: Box::new(right),
             }
         }
         Ok(expr)
@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator,
-                right: Box::new(right)
+                right: Box::new(right),
             }
         }
         Ok(expr)
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
             expr = Expr::Binary {
                 left: Box::new(expr),
                 operator,
-                right: Box::new(right)
+                right: Box::new(right),
             }
         }
         Ok(expr)
@@ -90,12 +90,10 @@ impl<'a> Parser<'a> {
         if self.match_token(vec![TokenType::BANG, TokenType::MINUS]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(
-                Expr::Unary {
-                    operator,
-                    right: Box::new(right)
-                }
-            );
+            return Ok(Expr::Unary {
+                operator,
+                right: Box::new(right),
+            });
         }
         self.primary()
     }
@@ -103,8 +101,8 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Expr> {
         if self.match_token(vec![TokenType::FALSE]) {
             return Ok(Expr::Literal {
-                value: Literal::Bool(false)
-            })
+                value: Literal::Bool(false),
+            });
         }
         if self.match_token(vec![TokenType::TRUE]) {
             return Ok(Expr::Literal {
@@ -118,22 +116,22 @@ impl<'a> Parser<'a> {
         }
         if self.match_token(vec![TokenType::NUMBER, TokenType::STRING]) {
             return Ok(Expr::Literal {
-                value: self.previous().literal.clone()
-            })
+                value: self.previous().literal.clone(),
+            });
         }
         if self.match_token(vec![TokenType::LEFT_PAREN]) {
             let expr = self.expression()?;
             self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression")?;
             return Ok(Expr::Grouping {
-                expr: Box::new(expr)
-            })
+                expr: Box::new(expr),
+            });
         }
         Err(self.error(self.peek(), "Expression expected"))
     }
 
     fn consume(&mut self, token_type: TokenType, message: &str) -> Result<&Token> {
         if self.check(&token_type) {
-            return Ok(self.advance())
+            return Ok(self.advance());
         }
         Err(self.error(self.peek(), message))
     }
@@ -175,8 +173,7 @@ impl<'a> Parser<'a> {
     }
 
     fn error(&self, token: &Token, message: &str) -> ParseError {
-        print_error(token.line, token.lexeme.clone(), message);
+        print_error(token.line, &token.lexeme, message);
         ParseError {}
     }
 }
-

@@ -29,11 +29,15 @@ impl expr::Visitor<String> for RpnNotation {
                 Literal::String(v) => v.to_string(),
                 Literal::Number(v) => format!("{}", v),
                 Literal::Bool(v) => v.to_string(),
-                Literal::None => String::from("nil")
-            }
+                Literal::None => String::from("nil"),
+            },
             Expr::Unary { operator, right } => self.format(&operator.lexeme, vec![right]),
             Expr::Grouping { expr } => self.format("", vec![expr]),
-            Expr::Binary { left, operator, right } => self.format(&operator.lexeme, vec![left, right]),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => self.format(&operator.lexeme, vec![left, right]),
             Expr::Var { .. } => String::from("nil"),
             Expr::Assign { .. } => String::from("nil"),
         }

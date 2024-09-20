@@ -6,7 +6,7 @@ pub enum Value {
     Boolean(bool),
     Number(f64),
     String(String),
-    Nil
+    Nil,
 }
 
 impl fmt::Display for Value {
@@ -15,7 +15,7 @@ impl fmt::Display for Value {
             Value::Boolean(value) => value.to_string(),
             Value::Number(value) => value.to_string(),
             Value::String(value) => value.to_string(),
-            Value::Nil => String::from("nil")
+            Value::Nil => String::from("nil"),
         };
         write!(f, "{}", s)
     }

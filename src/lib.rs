@@ -2,19 +2,19 @@ mod expr;
 mod parser;
 mod scanner;
 mod token;
-mod value;
 mod utils;
+mod value;
 
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::token::Token;
-use std::{fs, io, process};
 use crate::utils::ast_printer::AstPrinter;
 use crate::utils::rpn_printer::RpnNotation;
+use std::{fs, io, process};
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 
-struct RuntimeError {
+pub struct RuntimeError {
     token: Token,
     message: String,
 }
@@ -40,7 +40,7 @@ fn check_runtime_error() {
     }
 }
 
-pub fn print_error(line: usize, location: String, message: &str) {
+pub fn print_error(line: usize, location: &str, message: &str) {
     eprintln!("[line {line}] Error at '{location}': {message}");
     unsafe { HAD_RUNTIME_ERROR = true }
 }
@@ -91,13 +91,11 @@ fn run(source: String) {
 
     match parser.expression() {
         Ok(expr) => {
-            let ast_printer = RpnNotation{};
+            let ast_printer = RpnNotation {};
             println!("{}", ast_printer.print(&expr))
         }
         Err(_) => {
             println!("Err")
         }
     }
-
-
 }

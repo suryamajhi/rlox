@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::print_error;
 use crate::token::TokenType::*;
 use crate::token::{Literal, Token, TokenType};
-use std::collections::HashMap;
 
 pub struct Scanner<'a> {
     source: String,
@@ -108,16 +109,24 @@ impl<'a> Scanner<'a> {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
-                } else if self.match_char('*'){
+                } else if self.match_char('*') {
                     while !(self.peek() == '*' && self.peek_next() == '/') && !self.is_at_end() {
                         if self.peek() == '\n' {
                             self.line = self.line + 1;
                         }
                         self.advance();
                     }
-                    // consume * and /
-                    self.advance();
-                    self.advance();
+                    if self.is_at_end() {
+                        print_error(self.line, "at end", "Unclosed comment");
+                        return;
+                    }
+                    self.advance(); // consume *
+
+                    if self.is_at_end() {
+                        print_error(self.line, "at end", "Unclosed comment");
+                        return;
+                    }
+                    self.advance(); // consume *
                 } else {
                     self.add_token(SLASH, Literal::None)
                 }
@@ -133,7 +142,7 @@ impl<'a> Scanner<'a> {
                 } else {
                     print_error(
                         self.line,
-                        String::from(c),
+                        &c.to_string(),
                         &format!("Unexpected character: {}", c),
                     );
                 }
@@ -150,7 +159,7 @@ impl<'a> Scanner<'a> {
         }
 
         if self.is_at_end() {
-            print_error(self.line, "at end".to_string(), "Unterminated string");
+            print_error(self.line, "at end", "Unterminated string");
             return;
         }
 

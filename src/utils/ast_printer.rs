@@ -30,12 +30,16 @@ impl expr::Visitor<String> for AstPrinter {
                 Literal::Number(value) => format!("{:?}", value),
                 Literal::Bool(value) => value.to_string(),
                 Literal::None => String::from("nil"),
-            }
+            },
             Expr::Unary { operator, right } => self.parenthesize(&operator.lexeme, vec![right]),
             Expr::Grouping { expr } => self.parenthesize("group", vec![expr]),
-            Expr::Binary { left, operator, right } => self.parenthesize(&operator.lexeme, vec![left, right]),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => self.parenthesize(&operator.lexeme, vec![left, right]),
             Expr::Var { name } => name.lexeme.to_string(),
-            Expr::Assign { name, expr } => self.parenthesize(&name.lexeme, vec![expr])
+            Expr::Assign { name, expr } => self.parenthesize(&name.lexeme, vec![expr]),
         }
     }
 }
