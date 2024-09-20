@@ -1,5 +1,6 @@
 use crate::expr::Expr;
 use crate::print_error;
+use crate::token::TokenType::*;
 use crate::token::{Literal, Token, TokenType};
 
 #[derive(Debug)]
@@ -175,5 +176,21 @@ impl<'a> Parser<'a> {
     fn error(&self, token: &Token, message: &str) -> ParseError {
         print_error(token.line, &token.lexeme, message);
         ParseError {}
+    }
+
+    fn synchronize(&mut self) {
+        self.advance();
+        while !self.is_at_end() {
+            if self.previous().token_type == SEMICOLON {
+                return;
+            }
+            match self.peek().token_type {
+                CLASS | FUN | FOR | IF | PRINT | VAR | RETURN | WHILE => {
+                    return;
+                }
+                _ => {}
+            }
+            self.advance();
+        }
     }
 }

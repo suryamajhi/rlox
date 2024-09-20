@@ -1,10 +1,12 @@
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 mod token;
 mod utils;
 mod value;
 
+use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::token::Token;
@@ -83,17 +85,19 @@ fn run(source: String) {
         process::exit(64);
     }
 
-    for token in tokens.iter() {
-        println!("{}", token);
-    }
-
     let mut parser = Parser::new(&mut tokens);
+    let interpreter = Interpreter::new();
 
     match parser.expression() {
-        Ok(expr) => {
-            let ast_printer = RpnNotation {};
-            println!("{}", ast_printer.print(&expr))
-        }
+        Ok(expr) => match interpreter.evaluate(&expr) {
+            Ok(value) => {
+                println!("{}", value);
+            }
+            Err(err) => {
+                println!("Interpreter Error");
+                check_runtime_error();
+            }
+        },
         Err(_) => {
             println!("Err")
         }
