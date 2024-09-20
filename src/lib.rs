@@ -1,3 +1,11 @@
+use std::{fs, io, process};
+
+use crate::interpreter::Interpreter;
+use crate::parser::Parser;
+use crate::scanner::Scanner;
+use crate::stmt::Stmt;
+use crate::token::Token;
+
 mod expr;
 mod interpreter;
 mod parser;
@@ -5,14 +13,7 @@ mod scanner;
 mod token;
 mod utils;
 mod value;
-
-use crate::interpreter::Interpreter;
-use crate::parser::Parser;
-use crate::scanner::Scanner;
-use crate::token::Token;
-use crate::utils::ast_printer::AstPrinter;
-use crate::utils::rpn_printer::RpnNotation;
-use std::{fs, io, process};
+mod stmt;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 
@@ -27,6 +28,17 @@ pub enum Exception {
 impl Exception {
     fn runtime_error<T>(token: Token, message: String) -> Result<T, Exception> {
         Err(Exception::RuntimeError(RuntimeError { token, message }))
+    }
+}
+
+impl RuntimeError {
+    fn error(&self) {
+        eprintln!("{}", self.message);
+        eprintln!("[line {}]", self.token.line);
+
+        unsafe {
+            HAD_RUNTIME_ERROR = true;
+        }
     }
 }
 
@@ -84,22 +96,8 @@ fn run(source: String) {
     if runtime_error() {
         process::exit(64);
     }
-
     let mut parser = Parser::new(&mut tokens);
+    let stmts: Vec<Stmt> = parser.parse();
     let interpreter = Interpreter::new();
-
-    match parser.expression() {
-        Ok(expr) => match interpreter.evaluate(&expr) {
-            Ok(value) => {
-                println!("{}", value);
-            }
-            Err(err) => {
-                println!("Interpreter Error");
-                check_runtime_error();
-            }
-        },
-        Err(_) => {
-            println!("Err")
-        }
-    }
+    interpreter.interpret(&stmts);
 }

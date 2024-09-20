@@ -1,7 +1,9 @@
+use std::process;
 use crate::expr::Expr;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
-use crate::{expr, Exception};
+use crate::{expr, Exception, stmt};
+use crate::stmt::Stmt;
 
 type Result<T> = std::result::Result<T, Exception>;
 
@@ -10,6 +12,22 @@ pub struct Interpreter {}
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {}
+    }
+
+    pub fn interpret(&self, stmts: &Vec<Stmt>) {
+        for stmt in stmts {
+            match self.execute(stmt) {
+                Ok(_) => {}
+                Err(e) => match e { Exception::RuntimeError(e) => {
+                    e.error();
+                    process::exit(70);
+                } }
+            }
+        }
+    }
+
+    fn execute(&self, stmt: &Stmt) -> Result<()> {
+        stmt::Visitor::visit_stmt(self, stmt)
     }
 
     pub fn evaluate(&self, expr: &Expr) -> Result<Value> {
@@ -120,6 +138,16 @@ impl Interpreter {
     fn number_operand_error<T>(operator: &Token) -> Result<T> {
         Exception::runtime_error(operator.clone(), String::from("Operands must be a number"))
     }
+
+    fn visit_expr_stmt(&self, expr: &Expr) -> Result<()> {
+        self.evaluate(expr).map(|_| ())
+    }
+
+    fn visit_print_stmt(&self, expr: &Expr) -> Result<()> {
+        let res = self.evaluate(expr)?;
+        println!("{}", res);
+        Ok(())
+    }
 }
 
 impl expr::Visitor<Result<Value>> for Interpreter {
@@ -135,6 +163,15 @@ impl expr::Visitor<Result<Value>> for Interpreter {
             } => self.visit_binary_expr(left, operator, right),
             Expr::Var { .. } => Ok(Value::Nil),
             Expr::Assign { .. } => Ok(Value::Nil),
+        }
+    }
+}
+
+impl stmt::Visitor<Result<()>> for Interpreter {
+    fn visit_stmt(&self, stmt: &Stmt) -> Result<()> {
+        match stmt {
+            Stmt::Expression(expr) => self.visit_expr_stmt(expr),
+            Stmt::Print(expr) => self.visit_print_stmt(expr)
         }
     }
 }
