@@ -1,11 +1,16 @@
+mod expr;
 mod parser;
 mod scanner;
 mod token;
+mod value;
+mod utils;
 
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::token::Token;
 use std::{fs, io, process};
+use crate::utils::ast_printer::AstPrinter;
+use crate::utils::rpn_printer::RpnNotation;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 
@@ -21,6 +26,10 @@ impl Exception {
     fn runtime_error<T>(token: Token, message: String) -> Result<T, Exception> {
         Err(Exception::RuntimeError(RuntimeError { token, message }))
     }
+}
+
+fn runtime_error() -> bool {
+    unsafe { HAD_RUNTIME_ERROR }
 }
 
 fn check_runtime_error() {
@@ -69,9 +78,26 @@ fn run(source: String) {
     let mut tokens: Vec<Token> = Vec::new();
     let mut scanner = Scanner::new(source, &mut tokens);
     scanner.scan_tokens();
-    let mut parser = Parser::new(&mut tokens);
 
-    for token in tokens {
+    if runtime_error() {
+        process::exit(64);
+    }
+
+    for token in tokens.iter() {
         println!("{}", token);
     }
+
+    let mut parser = Parser::new(&mut tokens);
+
+    match parser.expression() {
+        Ok(expr) => {
+            let ast_printer = RpnNotation{};
+            println!("{}", ast_printer.print(&expr))
+        }
+        Err(_) => {
+            println!("Err")
+        }
+    }
+
+
 }

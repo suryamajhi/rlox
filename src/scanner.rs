@@ -108,6 +108,16 @@ impl<'a> Scanner<'a> {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
+                } else if self.match_char('*'){
+                    while !(self.peek() == '*' && self.peek_next() == '/') && !self.is_at_end() {
+                        if self.peek() == '\n' {
+                            self.line = self.line + 1;
+                        }
+                        self.advance();
+                    }
+                    // consume * and /
+                    self.advance();
+                    self.advance();
                 } else {
                     self.add_token(SLASH, Literal::None)
                 }
