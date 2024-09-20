@@ -1,9 +1,9 @@
-use std::process;
 use crate::expr::Expr;
 use crate::print_error;
 use crate::stmt::Stmt;
 use crate::token::TokenType::*;
 use crate::token::{Literal, Token, TokenType};
+use std::process;
 
 #[derive(Debug)]
 pub struct ParseError;
@@ -26,8 +26,8 @@ impl<'a> Parser<'a> {
             match self.declaration() {
                 None => {
                     self.synchronize();
-                },
-                Some(stmt) => statements.push(stmt)
+                }
+                Some(stmt) => statements.push(stmt),
             }
         }
         statements
@@ -44,7 +44,7 @@ impl<'a> Parser<'a> {
         }
         match res {
             Ok(stmt) => Some(stmt),
-            Err(_) => None
+            Err(_) => None,
         }
     }
 
@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
                 None => {
                     process::exit(65);
                 }
-                Some(stmt) => statements.push(stmt)
+                Some(stmt) => statements.push(stmt),
             }
         }
         match self.consume(RIGHT_BRACE, "Expect '}'.") {
@@ -79,10 +79,7 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(SEMICOLON, "Expect ';' after variable declaration")?;
-        Ok(Stmt::Var {
-            name,
-            initializer
-        })
+        Ok(Stmt::Var { name, initializer })
     }
 
     fn statement(&mut self) -> Result<Stmt> {
@@ -114,11 +111,11 @@ impl<'a> Parser<'a> {
             let equals = self.previous().clone();
             let value = self.assignment()?;
 
-            if let Expr::Var {name} = expr {
+            if let Expr::Var { name } = expr {
                 return Ok(Expr::Assign {
                     name,
-                    expr: Box::new(value)
-                })
+                    expr: Box::new(value),
+                });
             }
             return Err(self.error(&equals, "Invalid assignment target"));
         }
@@ -222,7 +219,7 @@ impl<'a> Parser<'a> {
         if self.match_token(vec![IDENTIFIER]) {
             return Ok(Expr::Var {
                 name: self.previous().clone(),
-            })
+            });
         }
         if self.match_token(vec![TokenType::LEFT_PAREN]) {
             let expr = self.expression()?;

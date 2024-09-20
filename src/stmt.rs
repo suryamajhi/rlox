@@ -8,9 +8,9 @@ pub trait Visitor<T> {
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
-    Var{
+    Var {
         name: Token,
         initializer: Option<Expr>,
     },
-    Block(Vec<Stmt>)
+    Block(Vec<Stmt>),
 }

@@ -1,21 +1,21 @@
-use std::process;
+use crate::environment::Environment;
 use crate::expr::Expr;
+use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
-use crate::{expr, Exception, stmt};
-use crate::environment::Environment;
-use crate::stmt::Stmt;
+use crate::{expr, stmt, Exception};
+use std::process;
 
 type Result<T> = std::result::Result<T, Exception>;
 
 pub struct Interpreter {
-    environment: Environment
+    environment: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            environment: Environment::new()
+            environment: Environment::new(),
         }
     }
 
@@ -23,10 +23,12 @@ impl Interpreter {
         for stmt in stmts {
             match self.execute(stmt) {
                 Ok(_) => {}
-                Err(e) => match e { Exception::RuntimeError(e) => {
-                    e.error();
-                    process::exit(70);
-                } }
+                Err(e) => match e {
+                    Exception::RuntimeError(e) => {
+                        e.error();
+                        process::exit(70);
+                    }
+                },
             }
         }
     }
@@ -216,8 +218,8 @@ impl stmt::Visitor<Result<()>> for Interpreter {
         match stmt {
             Stmt::Expression(expr) => self.visit_expr_stmt(expr),
             Stmt::Print(expr) => self.visit_print_stmt(expr),
-            Stmt::Var {name, initializer} => self.visit_var_stmt(name, initializer),
-            Stmt::Block(stmts) => self.visit_block_stmt(stmts)
+            Stmt::Var { name, initializer } => self.visit_var_stmt(name, initializer),
+            Stmt::Block(stmts) => self.visit_block_stmt(stmts),
         }
     }
 }

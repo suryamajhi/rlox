@@ -6,15 +6,15 @@ use crate::scanner::Scanner;
 use crate::stmt::Stmt;
 use crate::token::Token;
 
+mod environment;
 mod expr;
 mod interpreter;
 mod parser;
 mod scanner;
+mod stmt;
 mod token;
 mod utils;
 mod value;
-mod stmt;
-mod environment;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 

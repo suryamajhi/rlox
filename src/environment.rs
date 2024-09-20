@@ -1,19 +1,19 @@
-use std::collections::HashMap;
-use crate::Exception;
 use crate::token::Token;
 use crate::value::Value;
+use crate::Exception;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     values: HashMap<String, Value>,
-    enclosing: Option<Box<Environment>>
+    enclosing: Option<Box<Environment>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Environment {
             values: HashMap::new(),
-            enclosing: None
+            enclosing: None,
         }
     }
 
@@ -43,7 +43,7 @@ impl Environment {
     pub fn assign(&mut self, name: &Token, value: Value) -> Result<(), Exception> {
         if self.values.contains_key(&name.lexeme) {
             self.values.insert(name.lexeme.clone(), value);
-            return Ok(())
+            return Ok(());
         }
 
         if let Some(ref mut enclosing) = self.enclosing {
