@@ -13,4 +13,9 @@ pub enum Stmt {
         initializer: Option<Expr>,
     },
     Block(Vec<Stmt>),
+    If {
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
 }

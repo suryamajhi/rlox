@@ -194,6 +194,26 @@ impl Interpreter {
         self.environment = previous;
         Ok(())
     }
+
+    fn visit_if_stmt(
+        &mut self,
+        condition: &Expr,
+        then_branch: &Stmt,
+        else_branch: &Option<Box<Stmt>>,
+    ) -> Result<()> {
+        let value = self.evaluate(condition)?;
+        if (Interpreter::is_truthy(&value)) {
+            self.execute(then_branch)?;
+        } else {
+            match else_branch {
+                None => {}
+                Some(stmt) => {
+                    self.execute(stmt)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl expr::Visitor<Result<Value>> for Interpreter {
@@ -220,6 +240,11 @@ impl stmt::Visitor<Result<()>> for Interpreter {
             Stmt::Print(expr) => self.visit_print_stmt(expr),
             Stmt::Var { name, initializer } => self.visit_var_stmt(name, initializer),
             Stmt::Block(stmts) => self.visit_block_stmt(stmts),
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => self.visit_if_stmt(condition, then_branch, else_branch),
         }
     }
 }

@@ -35,10 +35,10 @@ impl<'a> Parser<'a> {
 
     fn declaration(&mut self) -> Option<Stmt> {
         let res;
-        if self.match_token(vec![VAR]) {
+        if self.match_token(vec![IF]) {
+            res = self.if_statement();
+        } else if self.match_token(vec![VAR]) {
             res = self.var_declaration();
-        } else if self.match_token(vec![LEFT_BRACE]) {
-            res = Ok(Stmt::Block(self.block()))
         } else {
             res = self.statement();
         }
@@ -46,6 +46,24 @@ impl<'a> Parser<'a> {
             Ok(stmt) => Some(stmt),
             Err(_) => None,
         }
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt> {
+        self.consume(LEFT_PAREN, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(RIGHT_PAREN, "Expect ')' after 'if'.")?;
+
+        let then_branch = self.statement()?;
+        let mut else_branch = None;
+        if self.match_token(vec![ELSE]) {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+
+        Ok(Stmt::If {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch,
+        })
     }
 
     fn block(&mut self) -> Vec<Stmt> {
@@ -85,6 +103,8 @@ impl<'a> Parser<'a> {
     fn statement(&mut self) -> Result<Stmt> {
         if self.match_token(vec![PRINT]) {
             return self.print_statement();
+        } else if self.match_token(vec![LEFT_BRACE]) {
+            return Ok(Stmt::Block(self.block()));
         }
         self.expression_statement()
     }
