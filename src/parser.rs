@@ -64,6 +64,43 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn for_statement(&mut self) -> Result<Stmt> {
+        self.consume(LEFT_PAREN, "Expect '(' after 'if'.")?;
+
+        let mut initializer: Option<Stmt>;
+        if self.match_token(vec![SEMICOLON]) {
+            initializer = None;
+        } else if self.match_token(vec![VAR]) {
+            initializer = Some(self.var_declaration()?);
+        } else {
+            initializer = Some(self.expression_statement()?);
+        }
+
+        let mut condition: Expr = Expr::Literal { value: Literal::Bool(true)};
+        if !self.check(&SEMICOLON) {
+            condition = self.expression()?;
+        }
+        self.consume(SEMICOLON, "Expect ';' after loop condition.")?;
+
+        let mut increment: Option<Expr> = None;
+        if !self.check(&RIGHT_PAREN) {
+            increment = Some(self.expression()?);
+        }
+        self.consume(RIGHT_PAREN, "Expect ')' after for clauses.")?;
+        let mut body = self.statement()?;
+
+        if let Some(inc) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expression(inc)])
+        };
+
+        body = Stmt::While { condition, body: Box::new(body)};
+
+        if let Some(init) = initializer {
+            body = Stmt::Block(vec![init, body]);
+        }
+        Ok(body)
+    }
+
     fn while_statement(&mut self) -> Result<Stmt> {
         self.consume(LEFT_PAREN, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
@@ -119,6 +156,8 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Block(self.block()));
         } else if self.match_token(vec![WHILE]) {
             return self.while_statement();
+        } else if self.match_token(vec![FOR]) {
+            return self.for_statement();
         }
         self.expression_statement()
     }
