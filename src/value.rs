@@ -1,3 +1,4 @@
+use crate::function::{Function, NativeFunction};
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -6,6 +7,8 @@ pub enum Value {
     Boolean(bool),
     Number(f64),
     String(String),
+    Function(Function),
+    NativeFunction(NativeFunction),
     Nil,
 }
 
@@ -16,6 +19,8 @@ impl fmt::Display for Value {
             Value::Number(value) => value.to_string(),
             Value::String(value) => value.to_string(),
             Value::Nil => String::from("nil"),
+            Value::Function(func) => format!("{}", func),
+            Value::NativeFunction(_) => "<native fn>".to_string(),
         };
         write!(f, "{}", s)
     }

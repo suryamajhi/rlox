@@ -45,6 +45,7 @@ impl expr::Visitor<String> for RpnNotation {
                 operator,
                 right,
             } => self.format(&operator.lexeme, vec![left, right]),
+            Expr::Call { .. } => String::from(""),
         }
     }
 }

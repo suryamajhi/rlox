@@ -5,9 +5,11 @@ use crate::parser::Parser;
 use crate::scanner::Scanner;
 use crate::stmt::Stmt;
 use crate::token::Token;
+use crate::value::Value;
 
 mod environment;
 mod expr;
+mod function;
 mod interpreter;
 mod parser;
 mod scanner;
@@ -24,6 +26,7 @@ pub struct RuntimeError {
 }
 pub enum Exception {
     RuntimeError(RuntimeError),
+    Return(Value),
 }
 
 impl Exception {
