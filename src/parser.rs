@@ -125,8 +125,36 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
+    fn logical_or(&mut self) -> Result<Expr> {
+        let mut expr = self.logical_and()?;
+        while self.match_token(vec![OR]) {
+            let operator = self.previous().clone();
+            let right = self.logical_and()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+        }
+        Ok(expr)
+    }
+
+    fn logical_and(&mut self) -> Result<Expr> {
+        let mut expr = self.equality()?;
+        while self.match_token(vec![AND]) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            }
+        }
+        Ok(expr)
+    }
+
     fn assignment(&mut self) -> Result<Expr> {
-        let expr = self.equality()?;
+        let expr = self.logical_or()?;
         if self.match_token(vec![EQUAL]) {
             let equals = self.previous().clone();
             let value = self.assignment()?;

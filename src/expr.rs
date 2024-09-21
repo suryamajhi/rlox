@@ -28,4 +28,9 @@ pub enum Expr {
         name: Token,
         expr: Box<Expr>,
     },
+    Logical {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
 }

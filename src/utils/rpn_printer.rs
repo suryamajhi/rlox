@@ -40,6 +40,11 @@ impl expr::Visitor<String> for RpnNotation {
             } => self.format(&operator.lexeme, vec![left, right]),
             Expr::Var { .. } => String::from("nil"),
             Expr::Assign { .. } => String::from("nil"),
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => self.format(&operator.lexeme, vec![left, right]),
         }
     }
 }

@@ -40,6 +40,11 @@ impl expr::Visitor<String> for AstPrinter {
             } => self.parenthesize(&operator.lexeme, vec![left, right]),
             Expr::Var { name } => name.lexeme.to_string(),
             Expr::Assign { name, expr } => self.parenthesize(&name.lexeme, vec![expr]),
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => self.parenthesize(&operator.lexeme, vec![left, right]),
         }
     }
 }
