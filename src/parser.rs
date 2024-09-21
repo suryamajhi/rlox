@@ -35,9 +35,7 @@ impl<'a> Parser<'a> {
 
     fn declaration(&mut self) -> Option<Stmt> {
         let res;
-        if self.match_token(vec![IF]) {
-            res = self.if_statement();
-        } else if self.match_token(vec![VAR]) {
+        if self.match_token(vec![VAR]) {
             res = self.var_declaration();
         } else {
             res = self.statement();
@@ -101,7 +99,9 @@ impl<'a> Parser<'a> {
     }
 
     fn statement(&mut self) -> Result<Stmt> {
-        if self.match_token(vec![PRINT]) {
+        if self.match_token(vec![IF]) {
+            return self.if_statement();
+        } else if self.match_token(vec![PRINT]) {
             return self.print_statement();
         } else if self.match_token(vec![LEFT_BRACE]) {
             return Ok(Stmt::Block(self.block()));
