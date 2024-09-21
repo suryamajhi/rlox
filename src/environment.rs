@@ -46,7 +46,7 @@ impl Environment {
             return Ok(());
         }
 
-        if let Some(ref mut enclosing) = self.enclosing {
+        if let Some(ref mut enclosing) = &mut self.enclosing {
             enclosing.assign(name, value)?;
             return Ok(());
         }

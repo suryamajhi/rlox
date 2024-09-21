@@ -64,6 +64,18 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn while_statement(&mut self) -> Result<Stmt> {
+        self.consume(LEFT_PAREN, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(RIGHT_PAREN, "Expect ')' after 'if'.")?;
+
+        let body = self.statement()?;
+        Ok(Stmt::While {
+            condition,
+            body: Box::new(body)
+        })
+    }
+
     fn block(&mut self) -> Vec<Stmt> {
         let mut statements = Vec::new();
         while !self.check(&RIGHT_BRACE) && !self.is_at_end() {
@@ -105,6 +117,8 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         } else if self.match_token(vec![LEFT_BRACE]) {
             return Ok(Stmt::Block(self.block()));
+        } else if self.match_token(vec![WHILE]) {
+            return self.while_statement();
         }
         self.expression_statement()
     }

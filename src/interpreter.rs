@@ -215,6 +215,13 @@ impl Interpreter {
         Ok(())
     }
 
+    fn visit_while_stmt(&mut self, condition: &Expr, body: &Stmt) -> Result<()> {
+        while Interpreter::is_truthy(&self.evaluate(condition)?) {
+            self.execute(body)?;
+        }
+        Ok(())
+    }
+
     fn visit_logical_expr(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Value> {
         let left = self.evaluate(left)?;
         if operator.token_type == TokenType::OR {
@@ -264,6 +271,10 @@ impl stmt::Visitor<Result<()>> for Interpreter {
                 then_branch,
                 else_branch,
             } => self.visit_if_stmt(condition, then_branch, else_branch),
+            Stmt::While {
+                condition,
+                body
+            } => self.visit_while_stmt(condition, body)
         }
     }
 }

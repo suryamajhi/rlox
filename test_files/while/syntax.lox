@@ -8,8 +8,8 @@ while (c < 3) print c = c + 1;
 // Block body.
 var a = 0;
 while (a < 3) {
-  print a;
   a = a + 1;
+  print a;
 }
 // expect: 0
 // expect: 1
