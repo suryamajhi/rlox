@@ -1,10 +1,11 @@
 use crate::token::{Literal, Token};
+use std::fmt::Arguments;
 
 pub trait Visitor<T> {
     fn visit_expr(&mut self, expr: &Expr) -> T;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal {
         value: Literal,
@@ -32,5 +33,10 @@ pub enum Expr {
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>,
+    },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
     },
 }

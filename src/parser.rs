@@ -35,7 +35,9 @@ impl<'a> Parser<'a> {
 
     fn declaration(&mut self) -> Option<Stmt> {
         let res;
-        if self.match_token(vec![VAR]) {
+        if self.match_token(vec![FUN]) {
+            res = self.function("function");
+        } else if self.match_token(vec![VAR]) {
             res = self.var_declaration();
         } else {
             res = self.statement();
@@ -44,6 +46,32 @@ impl<'a> Parser<'a> {
             Ok(stmt) => Some(stmt),
             Err(_) => None,
         }
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt> {
+        let name = self
+            .consume(IDENTIFIER, &format!("Expect {} name", kind))?
+            .clone();
+        self.consume(LEFT_PAREN, &format!("Expect '(' after {} name", kind))?;
+        let mut parameters = vec![];
+        if !self.check(&RIGHT_PAREN) {
+            parameters.push(self.consume(IDENTIFIER, "Expect parameter name.")?.clone());
+            while self.match_token(vec![COMMA]) {
+                if parameters.len() >= 255 {
+                    self.error(self.peek(), "Can't have more than 255 parameters");
+                }
+                parameters.push(self.consume(IDENTIFIER, "Expect parameter name.")?.clone());
+            }
+        }
+        self.consume(RIGHT_PAREN, "Expect ')' after parameters.")?;
+
+        self.consume(LEFT_BRACE, &format!("Expect  before {} body", kind))?;
+        let body = self.block();
+        Ok(Stmt::Function {
+            name,
+            params: parameters,
+            body,
+        })
     }
 
     fn if_statement(&mut self) -> Result<Stmt> {
@@ -76,7 +104,9 @@ impl<'a> Parser<'a> {
             initializer = Some(self.expression_statement()?);
         }
 
-        let mut condition: Expr = Expr::Literal { value: Literal::Bool(true)};
+        let mut condition: Expr = Expr::Literal {
+            value: Literal::Bool(true),
+        };
         if !self.check(&SEMICOLON) {
             condition = self.expression()?;
         }
@@ -93,7 +123,10 @@ impl<'a> Parser<'a> {
             body = Stmt::Block(vec![body, Stmt::Expression(inc)])
         };
 
-        body = Stmt::While { condition, body: Box::new(body)};
+        body = Stmt::While {
+            condition,
+            body: Box::new(body),
+        };
 
         if let Some(init) = initializer {
             body = Stmt::Block(vec![init, body]);
@@ -152,6 +185,8 @@ impl<'a> Parser<'a> {
             return self.if_statement();
         } else if self.match_token(vec![PRINT]) {
             return self.print_statement();
+        } else if self.match_token(vec![RETURN]) {
+            return self.return_statement();
         } else if self.match_token(vec![LEFT_BRACE]) {
             return Ok(Stmt::Block(self.block()));
         } else if self.match_token(vec![WHILE]) {
@@ -160,6 +195,17 @@ impl<'a> Parser<'a> {
             return self.for_statement();
         }
         self.expression_statement()
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt> {
+        let keyword = self.previous().clone();
+        let mut value: Option<Expr> = None;
+        if !self.check(&SEMICOLON) {
+            value = Some(self.expression()?);
+        }
+
+        self.consume(SEMICOLON, "Expect ';' after return value")?;
+        Ok(Stmt::Return { keyword, value })
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {
@@ -293,7 +339,38 @@ impl<'a> Parser<'a> {
                 right: Box::new(right),
             });
         }
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.match_token(vec![LEFT_PAREN]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut arguments = Vec::new();
+        if !self.check(&RIGHT_PAREN) {
+            arguments.push(self.expression()?);
+            while self.match_token(vec![COMMA]) {
+                if arguments.len() >= 255 {
+                    self.error(self.peek(), "Can't have more than 255 parameters.");
+                }
+                arguments.push(self.expression()?);
+            }
+        }
+        let paren = self.consume(RIGHT_PAREN, "Expect ')' after arguments")?;
+        Ok(Expr::Call {
+            callee: Box::new(callee),
+            paren: paren.clone(),
+            arguments,
+        })
     }
 
     fn primary(&mut self) -> Result<Expr> {

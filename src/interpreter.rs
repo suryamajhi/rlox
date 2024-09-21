@@ -1,21 +1,38 @@
 use crate::environment::{EnvRef, Environment};
 use crate::expr::Expr;
+use crate::function::{Callable, Function, NativeFunction};
 use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
 use crate::{expr, stmt, Exception};
+use std::fmt::Arguments;
 use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 type Result<T> = std::result::Result<T, Exception>;
 
 pub struct Interpreter {
     environment: EnvRef,
+    pub globals: EnvRef,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Environment::new();
+        globals.borrow_mut().define(
+            "clock".to_string(),
+            Value::NativeFunction(NativeFunction {
+                arity: 0,
+                callable: |_, _| {
+                    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                    Value::Number(timestamp.as_millis() as f64)
+                },
+            }),
+        );
+
         Interpreter {
-            environment: Environment::new(),
+            environment: globals.clone(),
+            globals,
         }
     }
 
@@ -28,6 +45,7 @@ impl Interpreter {
                         e.error();
                         process::exit(70);
                     }
+                    _ => {}
                 },
             }
         }
@@ -185,7 +203,7 @@ impl Interpreter {
         self.execute_block(stms, local_env)
     }
 
-    fn execute_block(&mut self, stmts: &Vec<Stmt>, environment: EnvRef) -> Result<()> {
+    pub fn execute_block(&mut self, stmts: &Vec<Stmt>, environment: EnvRef) -> Result<()> {
         let previous = self.environment.clone();
         self.environment = environment;
         for stmt in stmts {
@@ -238,6 +256,67 @@ impl Interpreter {
         }
         self.evaluate(right)
     }
+
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &Vec<Expr>,
+    ) -> Result<Value> {
+        let callee = self.evaluate(callee)?;
+
+        let mut args = vec![];
+        for argument in arguments {
+            args.push(self.evaluate(argument)?);
+        }
+        match callee {
+            Value::Function(func) => {
+                if arguments.len() != func.arity() {
+                    return Exception::runtime_error(
+                        paren.clone(),
+                        format!(
+                            "Expected {} arguments but got {}.",
+                            func.arity(),
+                            arguments.len()
+                        ),
+                    );
+                }
+                return func.call(self, args);
+            }
+            Value::NativeFunction(func) => {
+                if arguments.len() != func.arity() {
+                    return Exception::runtime_error(
+                        paren.clone(),
+                        format!(
+                            "Expected {} arguments but got {}.",
+                            func.arity(),
+                            arguments.len()
+                        ),
+                    );
+                }
+                return func.call(self, args);
+            }
+            _ => Exception::runtime_error(
+                paren.clone(),
+                "Can only call functions and classes.".to_string(),
+            ),
+        }
+    }
+
+    fn visit_function_stmt(&mut self, name: &Token, function_stmt: &Stmt) -> Result<()> {
+        let function = Function::new(function_stmt.clone(), self.environment.clone());
+        self.environment
+            .borrow_mut()
+            .define(name.lexeme.clone(), Value::Function(function));
+        Ok(())
+    }
+
+    fn visit_return_stmt(&mut self, value: &Option<Expr>) -> Result<()> {
+        match value {
+            None => Err(Exception::Return(Value::Nil)),
+            Some(expr) => Err(Exception::Return(self.evaluate(expr)?)),
+        }
+    }
 }
 
 impl expr::Visitor<Result<Value>> for Interpreter {
@@ -258,6 +337,11 @@ impl expr::Visitor<Result<Value>> for Interpreter {
                 operator,
                 right,
             } => self.visit_logical_expr(left, operator, right),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => self.visit_call_expr(callee, paren, arguments),
         }
     }
 }
@@ -275,6 +359,8 @@ impl stmt::Visitor<Result<()>> for Interpreter {
                 else_branch,
             } => self.visit_if_stmt(condition, then_branch, else_branch),
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
+            Stmt::Function { name, .. } => self.visit_function_stmt(name, stmt),
+            Stmt::Return { keyword, value } => self.visit_return_stmt(value),
         }
     }
 }

@@ -45,6 +45,7 @@ impl expr::Visitor<String> for AstPrinter {
                 operator,
                 right,
             } => self.parenthesize(&operator.lexeme, vec![left, right]),
+            Expr::Call { .. } => String::from(""),
         }
     }
 }
