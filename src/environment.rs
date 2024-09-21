@@ -1,27 +1,31 @@
 use crate::token::Token;
 use crate::value::Value;
 use crate::Exception;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
+
+pub type EnvRef = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     values: HashMap<String, Value>,
-    enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<EnvRef>,
 }
 
 impl Environment {
-    pub fn new() -> Self {
-        Environment {
+    pub fn new() -> EnvRef {
+        Rc::new(RefCell::new(Environment {
             values: HashMap::new(),
             enclosing: None,
-        }
+        }))
     }
 
-    pub fn new_local(enclosing: Environment) -> Self {
-        Environment {
-            enclosing: Some(Box::new(enclosing)),
+    pub fn new_local(enclosing: &EnvRef) -> EnvRef {
+        Rc::new(RefCell::new(Environment {
+            enclosing: Some(enclosing.clone()),
             values: HashMap::new(),
-        }
+        }))
     }
 
     pub fn define(&mut self, name: String, value: Value) {
@@ -34,7 +38,7 @@ impl Environment {
         }
 
         if let Some(enclosing) = &self.enclosing {
-            return enclosing.clone().get(name);
+            return enclosing.borrow().get(name);
         }
 
         Exception::runtime_error(name.clone(), format!("Undefined variable {}.", name.lexeme))
@@ -46,9 +50,8 @@ impl Environment {
             return Ok(());
         }
 
-        if let Some(ref mut enclosing) = &mut self.enclosing {
-            enclosing.assign(name, value)?;
-            return Ok(());
+        if let Some(enclosing) = &mut self.enclosing {
+            return enclosing.borrow_mut().assign(name, value);
         }
 
         Exception::runtime_error(name.clone(), format!("Undefined variable {}.", name.lexeme))

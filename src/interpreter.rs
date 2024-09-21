@@ -1,4 +1,4 @@
-use crate::environment::Environment;
+use crate::environment::{EnvRef, Environment};
 use crate::expr::Expr;
 use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
@@ -9,7 +9,7 @@ use std::process;
 type Result<T> = std::result::Result<T, Exception>;
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: EnvRef,
 }
 
 impl Interpreter {
@@ -161,12 +161,14 @@ impl Interpreter {
         if let Some(expr) = initializer {
             value = self.evaluate(expr)?;
         }
-        self.environment.define(name.lexeme.clone(), value);
+        self.environment
+            .borrow_mut()
+            .define(name.lexeme.clone(), value);
         Ok(())
     }
 
     fn lookup_variable(&self, name: &Token) -> Result<Value> {
-        self.environment.get(name)
+        self.environment.borrow().get(name)
     }
     fn visit_var_expr(&self, name: &Token) -> Result<Value> {
         self.lookup_variable(name)
@@ -174,15 +176,16 @@ impl Interpreter {
 
     fn visit_assign_expr(&mut self, name: &Token, expr: &Expr) -> Result<Value> {
         let value = self.evaluate(expr)?;
-        self.environment.assign(name, value.clone())?;
+        self.environment.borrow_mut().assign(name, value.clone())?;
         Ok(value)
     }
 
     fn visit_block_stmt(&mut self, stms: &Vec<Stmt>) -> Result<()> {
-        self.execute_block(stms, Environment::new_local(self.environment.clone()))
+        let local_env = Environment::new_local(&self.environment);
+        self.execute_block(stms, local_env)
     }
 
-    fn execute_block(&mut self, stmts: &Vec<Stmt>, environment: Environment) -> Result<()> {
+    fn execute_block(&mut self, stmts: &Vec<Stmt>, environment: EnvRef) -> Result<()> {
         let previous = self.environment.clone();
         self.environment = environment;
         for stmt in stmts {
@@ -271,10 +274,7 @@ impl stmt::Visitor<Result<()>> for Interpreter {
                 then_branch,
                 else_branch,
             } => self.visit_if_stmt(condition, then_branch, else_branch),
-            Stmt::While {
-                condition,
-                body
-            } => self.visit_while_stmt(condition, body)
+            Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
         }
     }
 }

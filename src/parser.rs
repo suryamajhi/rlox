@@ -72,7 +72,7 @@ impl<'a> Parser<'a> {
         let body = self.statement()?;
         Ok(Stmt::While {
             condition,
-            body: Box::new(body)
+            body: Box::new(body),
         })
     }
 
