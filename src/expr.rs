@@ -51,18 +51,23 @@ pub enum Expr {
     Get {
         uid: u8,
         object: Box<Expr>,
-        name: Token
+        name: Token,
     },
     Set {
         uid: u8,
         object: Box<Expr>,
         name: Token,
-        value: Box<Expr>
+        value: Box<Expr>,
     },
     This {
         uid: u8,
-        keyword: Token
-    }
+        keyword: Token,
+    },
+    Super {
+        uid: u8,
+        keyword: Token,
+        method: Token,
+    },
 }
 
 impl Expr {
@@ -76,9 +81,10 @@ impl Expr {
             Expr::Assign { uid, .. } => *uid,
             Expr::Logical { uid, .. } => *uid,
             Expr::Call { uid, .. } => *uid,
-            Expr::Set {uid, ..} => *uid,
-            Expr::Get {uid, ..} => *uid,
-            Expr::This {uid, ..} => *uid
+            Expr::Set { uid, .. } => *uid,
+            Expr::Get { uid, .. } => *uid,
+            Expr::This { uid, .. } => *uid,
+            Expr::Super { uid, .. } => *uid,
         }
     }
 }

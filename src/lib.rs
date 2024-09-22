@@ -8,6 +8,7 @@ use crate::stmt::Stmt;
 use crate::token::Token;
 use crate::value::Value;
 
+mod class;
 mod environment;
 mod expr;
 mod function;
@@ -19,14 +20,16 @@ mod stmt;
 mod token;
 mod utils;
 mod value;
-mod class;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 
+#[derive(Debug)]
 pub struct RuntimeError {
     token: Token,
     message: String,
 }
+
+#[derive(Debug)]
 pub enum Exception {
     RuntimeError(RuntimeError),
     Return(Value),

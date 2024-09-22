@@ -1,7 +1,7 @@
+use crate::class::{Class, ClassInstance, ClassInstanceRef};
 use crate::function::{Function, NativeFunction};
 use std::fmt;
 use std::fmt::Formatter;
-use crate::class::{Class, ClassInstance, ClassInstanceRef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{Exception, expr, RuntimeError, stmt};
-use crate::environment::{Environment, EnvRef};
+use crate::class::Class;
+use crate::environment::{EnvRef, Environment};
 use crate::expr::Expr;
 use crate::function::{Callable, Function, NativeFunction};
 use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
-use crate::class::Class;
+use crate::{expr, stmt, Exception, RuntimeError};
 
 type Result<T> = std::result::Result<T, Exception>;
 
@@ -352,22 +352,72 @@ impl Interpreter {
         }
     }
 
-    fn visit_class_stmt(&mut self, name: &Token, methods: &Vec<Stmt>) -> Result<()> {
-        self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
+    fn evaluate_super_class(
+        &mut self,
+        class_name: &Token,
+        super_class_expr: &Expr,
+    ) -> Result<Class> {
+        let evaluated = self.evaluate(super_class_expr)?;
+        match evaluated {
+            Value::Class(class) => Ok(class),
+            _ => Exception::runtime_error(
+                class_name.clone(),
+                String::from("Superclass must be a class"),
+            ),
+        }
+    }
+
+    fn visit_class_stmt(
+        &mut self,
+        name: &Token,
+        methods: &Vec<Stmt>,
+        super_class: &Option<Expr>,
+    ) -> Result<()> {
+        let super_class = match super_class {
+            None => None,
+            Some(expr) => {
+                let class = self.evaluate_super_class(name, expr)?;
+                Some(Box::new(class))
+            }
+        };
+
+        self.environment
+            .borrow_mut()
+            .define(name.lexeme.clone(), Value::Nil);
+
+        let prev_environment = self.environment.clone();
+        if let Some(super_class) = super_class.clone() {
+            self.environment = Environment::new_local(&self.environment);
+            self.environment
+                .borrow_mut()
+                .define("super".to_string(), Value::Class(*super_class))
+        }
 
         let mut class_methods = HashMap::new();
         for method in methods {
             match method {
-                Stmt::Function {name, body, params} => {
-                    let func = Function::new(method.clone(), self.environment.clone(), name.lexeme == "init");
+                Stmt::Function { name, body, params } => {
+                    let func = Function::new(
+                        method.clone(),
+                        self.environment.clone(),
+                        name.lexeme == "init",
+                    );
                     class_methods.insert(name.lexeme.clone(), func);
                 }
                 _ => {}
             }
         }
 
+        let klass = Value::Class(Class::new(
+            name.lexeme.clone(),
+            super_class.clone(),
+            class_methods,
+        ));
 
-        let klass = Value::Class(Class::new(name.lexeme.clone(), class_methods));
+        if super_class.is_some() {
+            self.environment = prev_environment;
+        }
+
         self.environment.borrow_mut().assign(name, klass)
     }
 
@@ -379,7 +429,7 @@ impl Interpreter {
         }
         Err(Exception::RuntimeError(RuntimeError {
             token: name.clone(),
-            message: "Only instances have properties".to_string()
+            message: "Only instances have properties".to_string(),
         }))
     }
 
@@ -393,12 +443,46 @@ impl Interpreter {
         }
         Err(Exception::RuntimeError(RuntimeError {
             token: name.clone(),
-            message: "Only instance have fields".to_string()
+            message: "Only instance have fields".to_string(),
         }))
     }
 
     fn visit_this_expr(&mut self, keyword: &Token, expr: &Expr) -> Result<Value> {
         self.lookup_variable(keyword, expr)
+    }
+
+    fn visit_super_expr(&mut self, expr: &Expr, method: &Token) -> Result<Value> {
+        let distance = self
+            .locals
+            .get(expr)
+            .expect("Super class to have been resolved");
+        let super_class = self.environment.borrow().get_at(*distance, "super")?;
+        let super_class = match super_class {
+            Value::Class(super_class) => super_class,
+            _ => panic!("Expected superclass to be a class!"),
+        };
+        let this = self
+            .environment
+            .borrow()
+            // "this" is always right inside where "super" is stored
+            .get_at(*distance - 1, "this")
+            .expect("'this' to have been resolved");
+        let this = match this {
+            Value::ClassInstance(instance) => instance,
+            _ => panic!("Expected 'this' to be a class instance!"),
+        };
+
+        let method = super_class.find_method(&method.lexeme).ok_or_else(|| {
+            Exception::runtime_error::<()>(
+                method.clone(),
+                format!("Undefined property {}.", method.lexeme),
+            )
+            .unwrap_err()
+        })?;
+        match method {
+            Value::Function(mut method) => Ok(Value::Function(method.bind(this))),
+            _ => panic!("Expected method to be a function!"),
+        }
     }
 }
 
@@ -430,9 +514,15 @@ impl expr::Visitor<Result<Value>> for Interpreter {
                 arguments,
                 ..
             } => self.visit_call_expr(callee, paren, arguments),
-            Expr::Get {name, object,..} => self.visit_get_expr(name, object),
-            Expr::Set {object, name, value, ..} => self.visit_set_expr(object, name, value),
-            Expr::This {keyword, ..} => self.visit_this_expr(keyword, expr),
+            Expr::Get { name, object, .. } => self.visit_get_expr(name, object),
+            Expr::Set {
+                object,
+                name,
+                value,
+                ..
+            } => self.visit_set_expr(object, name, value),
+            Expr::This { keyword, .. } => self.visit_this_expr(keyword, expr),
+            Expr::Super { method, .. } => self.visit_super_expr(expr, method),
         }
     }
 }
@@ -451,8 +541,16 @@ impl stmt::Visitor<Result<()>> for Interpreter {
             } => self.visit_if_stmt(condition, then_branch, else_branch),
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
             Stmt::Function { name, .. } => self.visit_function_stmt(name, stmt),
-            Stmt::Return { keyword: _keyword, value } => self.visit_return_stmt(value),
-            Stmt::Class {name, methods} => self.visit_class_stmt(name, methods),
+            Stmt::Return {
+                keyword: _keyword,
+                value,
+            } => self.visit_return_stmt(value),
+            Stmt::Class {
+                name,
+                methods,
+                super_class,
+                ..
+            } => self.visit_class_stmt(name, methods, super_class),
         }
     }
 }

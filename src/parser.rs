@@ -61,7 +61,16 @@ impl<'a> Parser<'a> {
 
     fn class_declaration(&mut self) -> Result<Stmt> {
         let name = self.consume(IDENTIFIER, "Expect class name")?.clone();
-        self.consume(LEFT_BRACE, "Expect '{' before class body");
+        let mut super_class: Option<Expr> = None;
+        if self.match_token(vec![LESS]) {
+            self.consume(IDENTIFIER, "Expect superclass name.")?;
+            super_class = Some(Expr::Var {
+                uid: next_id(),
+                name: self.previous().clone(),
+            })
+        }
+
+        self.consume(LEFT_BRACE, "Expect '{' before class body")?;
 
         let mut methods = Vec::new();
         while !self.check(&RIGHT_BRACE) && !self.is_at_end() {
@@ -72,7 +81,8 @@ impl<'a> Parser<'a> {
 
         Ok(Stmt::Class {
             name,
-            methods
+            methods,
+            super_class,
         })
     }
 
@@ -296,12 +306,12 @@ impl<'a> Parser<'a> {
                     value: Box::new(value),
                 });
             }
-            if let Expr::Get {name, object,..} = expr {
+            if let Expr::Get { name, object, .. } = expr {
                 return Ok(Expr::Set {
                     uid: next_id(),
                     name,
                     object,
-                    value: Box::new(value)
+                    value: Box::new(value),
                 });
             }
             return Err(self.error(&equals, "Invalid assignment target"));
@@ -393,8 +403,14 @@ impl<'a> Parser<'a> {
             if self.match_token(vec![LEFT_PAREN]) {
                 expr = self.finish_call(expr)?;
             } else if self.match_token(vec![DOT]) {
-                let name = self.consume(IDENTIFIER, "Expect property name after .")?.clone();
-                expr = Expr::Get { uid: next_id(), name, object: Box::new(expr)}
+                let name = self
+                    .consume(IDENTIFIER, "Expect property name after .")?
+                    .clone();
+                expr = Expr::Get {
+                    uid: next_id(),
+                    name,
+                    object: Box::new(expr),
+                }
             } else {
                 break;
             }
@@ -447,11 +463,22 @@ impl<'a> Parser<'a> {
                 value: self.previous().literal.clone(),
             });
         }
+        if self.match_token(vec![SUPER]) {
+            let keyword = self.previous().clone();
+            self.consume(DOT, "Expect '.' after 'super'.")?;
+            let method = self.consume(IDENTIFIER, "Expect superclass method name.")?;
+            return Ok(Expr::Super {
+                uid: next_id(),
+                keyword,
+                method: method.clone(),
+            });
+        }
+
         if self.match_token(vec![THIS]) {
             return Ok(Expr::This {
                 uid: next_id(),
-                keyword: self.previous().clone()
-            })
+                keyword: self.previous().clone(),
+            });
         }
         if self.match_token(vec![IDENTIFIER]) {
             return Ok(Expr::Var {

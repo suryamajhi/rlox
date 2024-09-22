@@ -1,12 +1,12 @@
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 
-use crate::{expr, print_error, runtime_error, stmt};
 use crate::expr::Expr;
 use crate::interpreter::Interpreter;
-use crate::RuntimeError;
 use crate::stmt::Stmt;
 use crate::token::Token;
+use crate::RuntimeError;
+use crate::{expr, print_error, runtime_error, stmt};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionType {
@@ -19,7 +19,8 @@ pub enum FunctionType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ClassType {
     NONE,
-    CLASS
+    CLASS,
+    SUBCLASS,
 }
 
 pub struct Resolver<'a> {
@@ -186,7 +187,11 @@ impl<'a> Resolver<'a> {
         }
         if let Some(value) = value {
             if self.current_function == FunctionType::INITIALIZER {
-                print_error(name.line, &name.lexeme, "Can't return a value from an initializer.");
+                print_error(
+                    name.line,
+                    &name.lexeme,
+                    "Can't return a value from an initializer.",
+                );
                 return;
             }
 
@@ -219,29 +224,49 @@ impl<'a> Resolver<'a> {
         self.resolve_expr(right);
     }
 
-    fn visit_class_stmt(&mut self, name: &Token, methods: &Vec<Stmt>)  {
+    fn visit_class_stmt(&mut self, name: &Token, methods: &Vec<Stmt>, super_class: &Option<Expr>) {
         let enclosing_class = self.current_class.clone();
         self.current_class = ClassType::CLASS;
 
         self.declare(name);
         self.define(name);
 
+        if let Some(super_class) = super_class {
+            if let Expr::Var { name: n, .. } = super_class {
+                if n.lexeme == name.lexeme {
+                    print_error(
+                        name.line,
+                        &name.lexeme,
+                        "A class can't inherit from itself.",
+                    )
+                }
+            }
+            self.current_class = ClassType::SUBCLASS;
+            self.resolve_expr(super_class);
+
+            self.begin_scope();
+            self.peek_scopes_mut().insert(String::from("super"), true);
+        }
+
         self.begin_scope();
         self.peek_scopes_mut().insert("this".to_string(), true);
 
         for method in methods {
             match method {
-                Stmt::Function {params, body, name} => {
+                Stmt::Function { params, body, name } => {
                     let mut declaration = FunctionType::METHOD;
                     if name.lexeme == "init" {
                         declaration = FunctionType::INITIALIZER;
                     }
                     self.resolve_function(params, body, declaration);
                 }
-                _ => panic!("Method is not a function")
+                _ => panic!("Method is not a function"),
             }
         }
         self.end_scope();
+        if super_class.is_some() {
+            self.end_scope();
+        }
 
         self.current_class = enclosing_class;
     }
@@ -257,7 +282,28 @@ impl<'a> Resolver<'a> {
 
     fn visit_this_expr(&mut self, keyword: &Token, expr: &Expr) {
         if let ClassType::NONE = self.current_class {
-            print_error(keyword.line, &keyword.lexeme, "Can't use 'this' outside of a class");
+            print_error(
+                keyword.line,
+                &keyword.lexeme,
+                "Can't use 'this' outside of a class",
+            );
+        }
+        self.resolve_local(expr, keyword);
+    }
+
+    fn visit_super_expr(&mut self, keyword: &Token, expr: &Expr) {
+        if self.current_class == ClassType::NONE {
+            print_error(
+                keyword.line,
+                &keyword.lexeme,
+                "Can't use 'super' outside of a class.",
+            );
+        } else if self.current_class != ClassType::SUBCLASS {
+            print_error(
+                keyword.line,
+                &keyword.lexeme,
+                "Can't use 'super' in a class with no superclass",
+            );
         }
         self.resolve_local(expr, keyword);
     }
@@ -268,7 +314,9 @@ impl expr::Visitor<()> for Resolver<'_> {
         match expr {
             Expr::Literal { .. } => {}
             Expr::Unary {
-                operator: _operator, right, ..
+                operator: _operator,
+                right,
+                ..
             } => self.visit_unary_expr(right),
             Expr::Grouping { expr, .. } => self.visit_grouping_expr(expr),
             Expr::Binary {
@@ -288,9 +336,17 @@ impl expr::Visitor<()> for Resolver<'_> {
             Expr::Call {
                 callee, arguments, ..
             } => self.visit_call_expr(callee, arguments),
-            Expr::Get {object, ..} => self.visit_get_expr(object),
-            Expr::Set {object, name, value,..} => self.visit_set_expr(object, name, value),
-            Expr::This {keyword, ..} => self.visit_this_expr(keyword, expr)
+            Expr::Get { object, .. } => self.visit_get_expr(object),
+            Expr::Set {
+                object,
+                name,
+                value,
+                ..
+            } => self.visit_set_expr(object, name, value),
+            Expr::This { keyword, .. } => self.visit_this_expr(keyword, expr),
+            Expr::Super {
+                keyword, method, ..
+            } => self.visit_super_expr(keyword, expr),
         }
     }
 }
@@ -310,7 +366,11 @@ impl stmt::Visitor<()> for Resolver<'_> {
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
             Stmt::Function { name, params, body } => self.visit_function_stmt(name, params, body),
             Stmt::Return { keyword, value } => self.visit_return_stmt(keyword, value),
-            Stmt::Class {name, methods} => self.visit_class_stmt(name, methods),
+            Stmt::Class {
+                name,
+                methods,
+                super_class,
+            } => self.visit_class_stmt(name, methods, super_class),
         }
     }
 }

@@ -1,32 +1,42 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fmt;
-use std::fmt::{Formatter, write};
-use std::rc::Rc;
-use crate::{Exception, RuntimeError};
 use crate::function::{Callable, Function};
 use crate::interpreter::Interpreter;
 use crate::token::Token;
 use crate::value::Value;
+use crate::{Exception, RuntimeError};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt;
+use std::fmt::{write, Formatter};
+use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Class {
     name: String,
-    methods: HashMap<String, Function>
+    super_class: Option<Box<Class>>,
+    methods: HashMap<String, Function>,
 }
 
-
 impl Class {
-    pub fn new(name: String, methods: HashMap<String, Function>) -> Self {
+    pub fn new(
+        name: String,
+        super_class: Option<Box<Class>>,
+        methods: HashMap<String, Function>,
+    ) -> Self {
         Class {
             name,
-            methods
+            super_class,
+            methods,
         }
     }
 
     pub fn find_method(&self, name: &str) -> Option<Value> {
-        self.methods.get(name)
+        self.methods
+            .get(name)
             .map(|method| Value::Function(method.clone()))
+            .or(self
+                .super_class
+                .as_ref()
+                .and_then(|super_class| super_class.find_method(name)))
     }
 }
 
@@ -49,8 +59,7 @@ impl Callable for Class {
                 Value::Function(mut initializer) => {
                     let _ = initializer.bind(instance.clone()).call(interpreter, args);
                 }
-                _ => panic!("Initializer is not a function")
-
+                _ => panic!("Initializer is not a function"),
             }
         }
 
@@ -64,21 +73,19 @@ impl fmt::Display for Class {
     }
 }
 
-
 pub type ClassInstanceRef = Rc<RefCell<ClassInstance>>;
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassInstance {
     class: Class,
-    fields: HashMap<String, Value>
+    fields: HashMap<String, Value>,
 }
 
 impl ClassInstance {
     pub fn new(class: Class) -> ClassInstanceRef {
         Rc::new(RefCell::new(ClassInstance {
             class,
-            fields: HashMap::new()
+            fields: HashMap::new(),
         }))
     }
 
@@ -89,12 +96,12 @@ impl ClassInstance {
 
         if let Some(Value::Function(mut method)) = self.class.find_method(&name.lexeme) {
             let bound = method.bind(instance_ref.clone());
-            return Ok(Value::Function(bound))
+            return Ok(Value::Function(bound));
         }
 
         Err(Exception::RuntimeError(RuntimeError {
             token: name.clone(),
-            message: format!("Undefined property '{}'", name.lexeme)
+            message: format!("Undefined property '{}'", name.lexeme),
         }))
     }
 

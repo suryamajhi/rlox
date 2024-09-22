@@ -50,7 +50,7 @@ impl expr::Visitor<String> for AstPrinter {
                 ..
             } => self.parenthesize(&operator.lexeme, vec![left, right]),
             Expr::Call { .. } => String::from(""),
-            _ => String::from("not implemented")
+            _ => String::from("not implemented"),
         }
     }
 }

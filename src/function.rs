@@ -1,3 +1,4 @@
+use crate::class::{ClassInstance, ClassInstanceRef};
 use crate::environment::{EnvRef, Environment};
 use crate::interpreter::Interpreter;
 use crate::stmt::Stmt;
@@ -5,7 +6,6 @@ use crate::value::Value;
 use crate::Exception;
 use std::fmt;
 use std::fmt::Formatter;
-use crate::class::{ClassInstance, ClassInstanceRef};
 
 pub trait Callable {
     fn arity(&self) -> usize;
@@ -40,13 +40,15 @@ impl Function {
         Function {
             declaration,
             closure,
-            is_initializer
+            is_initializer,
         }
     }
 
     pub fn bind(&mut self, instance: ClassInstanceRef) -> Function {
-        let environment  = Environment::new_local(&self.closure);
-        environment.borrow_mut().define(String::from("this"), Value::ClassInstance(instance));
+        let environment = Environment::new_local(&self.closure);
+        environment
+            .borrow_mut()
+            .define(String::from("this"), Value::ClassInstance(instance));
         Function::new(self.declaration.clone(), environment, false)
     }
 }
@@ -76,7 +78,7 @@ impl Callable for Function {
                             return self.closure.borrow().get_at(0, "this");
                         }
                         return Ok(value);
-                    },
+                    }
                 };
             }
         }
