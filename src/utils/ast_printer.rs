@@ -25,25 +25,29 @@ impl AstPrinter {
 impl expr::Visitor<String> for AstPrinter {
     fn visit_expr(&mut self, expr: &Expr) -> String {
         match expr {
-            Expr::Literal { value } => match value {
+            Expr::Literal { value, .. } => match value {
                 Literal::String(value) => value.to_string(),
                 Literal::Number(value) => format!("{:?}", value),
                 Literal::Bool(value) => value.to_string(),
                 Literal::None => String::from("nil"),
             },
-            Expr::Unary { operator, right } => self.parenthesize(&operator.lexeme, vec![right]),
-            Expr::Grouping { expr } => self.parenthesize("group", vec![expr]),
+            Expr::Unary {
+                operator, right, ..
+            } => self.parenthesize(&operator.lexeme, vec![right]),
+            Expr::Grouping { expr, .. } => self.parenthesize("group", vec![expr]),
             Expr::Binary {
                 left,
                 operator,
                 right,
+                ..
             } => self.parenthesize(&operator.lexeme, vec![left, right]),
-            Expr::Var { name } => name.lexeme.to_string(),
-            Expr::Assign { name, expr } => self.parenthesize(&name.lexeme, vec![expr]),
+            Expr::Var { name, .. } => name.lexeme.to_string(),
+            Expr::Assign { name, value, .. } => self.parenthesize(&name.lexeme, vec![value]),
             Expr::Logical {
                 left,
                 operator,
                 right,
+                ..
             } => self.parenthesize(&operator.lexeme, vec![left, right]),
             Expr::Call { .. } => String::from(""),
         }

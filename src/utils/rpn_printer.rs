@@ -25,18 +25,21 @@ impl RpnNotation {
 impl expr::Visitor<String> for RpnNotation {
     fn visit_expr(&mut self, expr: &Expr) -> String {
         match expr {
-            Expr::Literal { value } => match value {
+            Expr::Literal { value, .. } => match value {
                 Literal::String(v) => v.to_string(),
                 Literal::Number(v) => format!("{}", v),
                 Literal::Bool(v) => v.to_string(),
                 Literal::None => String::from("nil"),
             },
-            Expr::Unary { operator, right } => self.format(&operator.lexeme, vec![right]),
-            Expr::Grouping { expr } => self.format("", vec![expr]),
+            Expr::Unary {
+                operator, right, ..
+            } => self.format(&operator.lexeme, vec![right]),
+            Expr::Grouping { expr, .. } => self.format("", vec![expr]),
             Expr::Binary {
                 left,
                 operator,
                 right,
+                ..
             } => self.format(&operator.lexeme, vec![left, right]),
             Expr::Var { .. } => String::from("nil"),
             Expr::Assign { .. } => String::from("nil"),
@@ -44,6 +47,7 @@ impl expr::Visitor<String> for RpnNotation {
                 left,
                 operator,
                 right,
+                ..
             } => self.format(&operator.lexeme, vec![left, right]),
             Expr::Call { .. } => String::from(""),
         }

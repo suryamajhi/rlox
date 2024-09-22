@@ -5,6 +5,15 @@ use crate::token::TokenType::*;
 use crate::token::{Literal, Token, TokenType};
 use std::process;
 
+static mut ID: u8 = 0;
+
+fn next_id() -> u8 {
+    unsafe {
+        ID += 1;
+        ID
+    }
+}
+
 #[derive(Debug)]
 pub struct ParseError;
 
@@ -105,6 +114,7 @@ impl<'a> Parser<'a> {
         }
 
         let mut condition: Expr = Expr::Literal {
+            uid: next_id(),
             value: Literal::Bool(true),
         };
         if !self.check(&SEMICOLON) {
@@ -230,6 +240,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.logical_and()?;
             expr = Expr::Logical {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -244,6 +255,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.equality()?;
             expr = Expr::Logical {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -258,10 +270,11 @@ impl<'a> Parser<'a> {
             let equals = self.previous().clone();
             let value = self.assignment()?;
 
-            if let Expr::Var { name } = expr {
+            if let Expr::Var { name, .. } = expr {
                 return Ok(Expr::Assign {
+                    uid: next_id(),
                     name,
-                    expr: Box::new(value),
+                    value: Box::new(value),
                 });
             }
             return Err(self.error(&equals, "Invalid assignment target"));
@@ -275,6 +288,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.comparison()?;
             expr = Expr::Binary {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -294,6 +308,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.term()?;
             expr = Expr::Binary {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -308,6 +323,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.factor()?;
             expr = Expr::Binary {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -322,6 +338,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             expr = Expr::Binary {
+                uid: next_id(),
                 left: Box::new(expr),
                 operator,
                 right: Box::new(right),
@@ -335,6 +352,7 @@ impl<'a> Parser<'a> {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary {
+                uid: next_id(),
                 operator,
                 right: Box::new(right),
             });
@@ -367,6 +385,7 @@ impl<'a> Parser<'a> {
         }
         let paren = self.consume(RIGHT_PAREN, "Expect ')' after arguments")?;
         Ok(Expr::Call {
+            uid: next_id(),
             callee: Box::new(callee),
             paren: paren.clone(),
             arguments,
@@ -376,26 +395,31 @@ impl<'a> Parser<'a> {
     fn primary(&mut self) -> Result<Expr> {
         if self.match_token(vec![TokenType::FALSE]) {
             return Ok(Expr::Literal {
+                uid: next_id(),
                 value: Literal::Bool(false),
             });
         }
         if self.match_token(vec![TokenType::TRUE]) {
             return Ok(Expr::Literal {
+                uid: next_id(),
                 value: Literal::Bool(true),
             });
         }
         if self.match_token(vec![TokenType::NIL]) {
             return Ok(Expr::Literal {
+                uid: next_id(),
                 value: Literal::None,
             });
         }
         if self.match_token(vec![TokenType::NUMBER, TokenType::STRING]) {
             return Ok(Expr::Literal {
+                uid: next_id(),
                 value: self.previous().literal.clone(),
             });
         }
         if self.match_token(vec![IDENTIFIER]) {
             return Ok(Expr::Var {
+                uid: next_id(),
                 name: self.previous().clone(),
             });
         }
@@ -403,6 +427,7 @@ impl<'a> Parser<'a> {
             let expr = self.expression()?;
             self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression")?;
             return Ok(Expr::Grouping {
+                uid: next_id(),
                 expr: Box::new(expr),
             });
         }

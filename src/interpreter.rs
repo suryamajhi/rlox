@@ -5,6 +5,7 @@ use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
 use crate::{expr, stmt, Exception};
+use std::collections::HashMap;
 use std::fmt::Arguments;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,6 +15,7 @@ type Result<T> = std::result::Result<T, Exception>;
 pub struct Interpreter {
     environment: EnvRef,
     pub globals: EnvRef,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
@@ -33,6 +35,7 @@ impl Interpreter {
         Interpreter {
             environment: globals.clone(),
             globals,
+            locals: HashMap::new(),
         }
     }
 
@@ -55,6 +58,9 @@ impl Interpreter {
         stmt::Visitor::visit_stmt(self, stmt)
     }
 
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.clone(), depth);
+    }
     pub fn evaluate(&mut self, expr: &Expr) -> Result<Value> {
         expr::Visitor::visit_expr(self, expr)
     }
@@ -185,16 +191,30 @@ impl Interpreter {
         Ok(())
     }
 
-    fn lookup_variable(&self, name: &Token) -> Result<Value> {
-        self.environment.borrow().get(name)
+    fn lookup_variable(&self, name: &Token, expr: &Expr) -> Result<Value> {
+        let distance = self.locals.get(expr);
+
+        match distance {
+            None => self.globals.borrow().get(name),
+            Some(distance) => self.environment.borrow().get_at(*distance, &name.lexeme),
+        }
     }
-    fn visit_var_expr(&self, name: &Token) -> Result<Value> {
-        self.lookup_variable(name)
+    fn visit_var_expr(&self, name: &Token, expr: &Expr) -> Result<Value> {
+        self.lookup_variable(name, expr)
     }
 
     fn visit_assign_expr(&mut self, name: &Token, expr: &Expr) -> Result<Value> {
         let value = self.evaluate(expr)?;
-        self.environment.borrow_mut().assign(name, value.clone())?;
+
+        let distance = self.locals.get(expr);
+        match distance {
+            Some(distance) => self
+                .environment
+                .borrow_mut()
+                .assign_at(*distance, name, &value),
+            None => self.environment.borrow_mut().assign(name, value.clone())?,
+        }
+
         Ok(value)
     }
 
@@ -322,25 +342,30 @@ impl Interpreter {
 impl expr::Visitor<Result<Value>> for Interpreter {
     fn visit_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
-            Expr::Literal { value } => Ok(self.visit_literal_expr(value)),
-            Expr::Unary { operator, right } => self.visit_unary_expr(operator, right),
-            Expr::Grouping { expr } => self.evaluate(expr),
+            Expr::Literal { value, .. } => Ok(self.visit_literal_expr(value)),
+            Expr::Unary {
+                operator, right, ..
+            } => self.visit_unary_expr(operator, right),
+            Expr::Grouping { expr, .. } => self.evaluate(expr),
             Expr::Binary {
                 left,
                 operator,
                 right,
+                ..
             } => self.visit_binary_expr(left, operator, right),
-            Expr::Var { name } => self.visit_var_expr(name),
-            Expr::Assign { name, expr } => self.visit_assign_expr(name, expr),
+            Expr::Var { name, .. } => self.visit_var_expr(name, expr),
+            Expr::Assign { name, value, .. } => self.visit_assign_expr(name, value),
             Expr::Logical {
                 left,
                 operator,
                 right,
+                ..
             } => self.visit_logical_expr(left, operator, right),
             Expr::Call {
                 callee,
                 paren,
                 arguments,
+                ..
             } => self.visit_call_expr(callee, paren, arguments),
         }
     }

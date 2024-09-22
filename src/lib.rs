@@ -2,6 +2,7 @@ use std::{fs, io, process};
 
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
+use crate::resolver::Resolver;
 use crate::scanner::Scanner;
 use crate::stmt::Stmt;
 use crate::token::Token;
@@ -12,6 +13,7 @@ mod expr;
 mod function;
 mod interpreter;
 mod parser;
+mod resolver;
 mod scanner;
 mod stmt;
 mod token;
@@ -103,5 +105,11 @@ fn run(source: String) {
     let mut parser = Parser::new(&mut tokens);
     let stmts: Vec<Stmt> = parser.parse();
     let mut interpreter = Interpreter::new();
+
+    let mut resolver = Resolver::new(&mut interpreter);
+    resolver.resolve_block(&stmts);
+
+    check_runtime_error();
+
     interpreter.interpret(&stmts);
 }
