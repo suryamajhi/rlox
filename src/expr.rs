@@ -1,6 +1,6 @@
-use crate::token::{Literal, Token};
-use std::fmt::Arguments;
 use std::hash::{Hash, Hasher};
+
+use crate::token::{Literal, Token};
 
 pub trait Visitor<T> {
     fn visit_expr(&mut self, expr: &Expr) -> T;

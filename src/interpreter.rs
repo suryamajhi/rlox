@@ -1,14 +1,14 @@
-use crate::environment::{EnvRef, Environment};
+use std::collections::HashMap;
+use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::{Exception, expr, stmt};
+use crate::environment::{Environment, EnvRef};
 use crate::expr::Expr;
 use crate::function::{Callable, Function, NativeFunction};
 use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
-use crate::{expr, stmt, Exception};
-use std::collections::HashMap;
-use std::fmt::Arguments;
-use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 type Result<T> = std::result::Result<T, Exception>;
 
@@ -243,7 +243,7 @@ impl Interpreter {
         else_branch: &Option<Box<Stmt>>,
     ) -> Result<()> {
         let value = self.evaluate(condition)?;
-        if (Interpreter::is_truthy(&value)) {
+        if Interpreter::is_truthy(&value) {
             self.execute(then_branch)?;
         } else {
             match else_branch {
@@ -385,7 +385,7 @@ impl stmt::Visitor<Result<()>> for Interpreter {
             } => self.visit_if_stmt(condition, then_branch, else_branch),
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
             Stmt::Function { name, .. } => self.visit_function_stmt(name, stmt),
-            Stmt::Return { keyword, value } => self.visit_return_stmt(value),
+            Stmt::Return { keyword: _keyword, value } => self.visit_return_stmt(value),
         }
     }
 }

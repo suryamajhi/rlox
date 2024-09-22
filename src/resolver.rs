@@ -1,12 +1,12 @@
-use crate::expr::Expr;
-use crate::interpreter::Interpreter;
-use crate::stmt::Stmt;
-use crate::token::Token;
-use crate::RuntimeError;
-use crate::{expr, print_error, stmt, Exception};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::fmt::Arguments;
+
+use crate::{expr, print_error, stmt};
+use crate::expr::Expr;
+use crate::interpreter::Interpreter;
+use crate::RuntimeError;
+use crate::stmt::Stmt;
+use crate::token::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionType {
@@ -209,12 +209,12 @@ impl expr::Visitor<()> for Resolver<'_> {
         match expr {
             Expr::Literal { .. } => {}
             Expr::Unary {
-                operator, right, ..
+                operator: _operator, right, ..
             } => self.visit_unary_expr(right),
             Expr::Grouping { expr, .. } => self.visit_grouping_expr(expr),
             Expr::Binary {
                 left,
-                operator,
+                operator: _operator,
                 right,
                 ..
             } => self.visit_binary_expr(left, right),
@@ -222,7 +222,7 @@ impl expr::Visitor<()> for Resolver<'_> {
             Expr::Assign { name, value, .. } => self.visit_assign_expr(name, value, expr),
             Expr::Logical {
                 left,
-                operator,
+                operator: _operator,
                 right,
                 ..
             } => self.visit_binary_expr(left, right),

@@ -104,7 +104,7 @@ impl<'a> Parser<'a> {
     fn for_statement(&mut self) -> Result<Stmt> {
         self.consume(LEFT_PAREN, "Expect '(' after 'if'.")?;
 
-        let mut initializer: Option<Stmt>;
+        let initializer: Option<Stmt>;
         if self.match_token(vec![SEMICOLON]) {
             initializer = None;
         } else if self.match_token(vec![VAR]) {
@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         }
         match self.consume(RIGHT_BRACE, "Expect '}'.") {
             Ok(_) => {}
-            Err(err) => process::exit(65),
+            Err(_err) => process::exit(65),
         };
         statements
     }
