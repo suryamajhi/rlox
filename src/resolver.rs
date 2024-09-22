@@ -1,7 +1,7 @@
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 
-use crate::{expr, print_error, stmt};
+use crate::{expr, print_error, runtime_error, stmt};
 use crate::expr::Expr;
 use crate::interpreter::Interpreter;
 use crate::RuntimeError;
@@ -12,11 +12,21 @@ use crate::token::Token;
 pub enum FunctionType {
     NONE,
     FUNCTION,
+    METHOD,
+    INITIALIZER,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ClassType {
+    NONE,
+    CLASS
+}
+
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl<'a> Resolver<'a> {
@@ -25,6 +35,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: Vec::new(),
             current_function: FunctionType::NONE,
+            current_class: ClassType::NONE,
         }
     }
 
@@ -174,6 +185,11 @@ impl<'a> Resolver<'a> {
             .error();
         }
         if let Some(value) = value {
+            if self.current_function == FunctionType::INITIALIZER {
+                print_error(name.line, &name.lexeme, "Can't return a value from an initializer.");
+                return;
+            }
+
             self.resolve_expr(value);
         }
     }
@@ -202,6 +218,49 @@ impl<'a> Resolver<'a> {
     fn visit_unary_expr(&mut self, right: &Expr) {
         self.resolve_expr(right);
     }
+
+    fn visit_class_stmt(&mut self, name: &Token, methods: &Vec<Stmt>)  {
+        let enclosing_class = self.current_class.clone();
+        self.current_class = ClassType::CLASS;
+
+        self.declare(name);
+        self.define(name);
+
+        self.begin_scope();
+        self.peek_scopes_mut().insert("this".to_string(), true);
+
+        for method in methods {
+            match method {
+                Stmt::Function {params, body, name} => {
+                    let mut declaration = FunctionType::METHOD;
+                    if name.lexeme == "init" {
+                        declaration = FunctionType::INITIALIZER;
+                    }
+                    self.resolve_function(params, body, declaration);
+                }
+                _ => panic!("Method is not a function")
+            }
+        }
+        self.end_scope();
+
+        self.current_class = enclosing_class;
+    }
+
+    fn visit_get_expr(&mut self, object: &Expr) {
+        self.resolve_expr(object);
+    }
+
+    fn visit_set_expr(&mut self, object: &Expr, name: &Token, value: &Expr) {
+        self.resolve_expr(object);
+        self.resolve_expr(value);
+    }
+
+    fn visit_this_expr(&mut self, keyword: &Token, expr: &Expr) {
+        if let ClassType::NONE = self.current_class {
+            print_error(keyword.line, &keyword.lexeme, "Can't use 'this' outside of a class");
+        }
+        self.resolve_local(expr, keyword);
+    }
 }
 
 impl expr::Visitor<()> for Resolver<'_> {
@@ -229,6 +288,9 @@ impl expr::Visitor<()> for Resolver<'_> {
             Expr::Call {
                 callee, arguments, ..
             } => self.visit_call_expr(callee, arguments),
+            Expr::Get {object, ..} => self.visit_get_expr(object),
+            Expr::Set {object, name, value,..} => self.visit_set_expr(object, name, value),
+            Expr::This {keyword, ..} => self.visit_this_expr(keyword, expr)
         }
     }
 }
@@ -248,6 +310,7 @@ impl stmt::Visitor<()> for Resolver<'_> {
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
             Stmt::Function { name, params, body } => self.visit_function_stmt(name, params, body),
             Stmt::Return { keyword, value } => self.visit_return_stmt(keyword, value),
+            Stmt::Class {name, methods} => self.visit_class_stmt(name, methods),
         }
     }
 }

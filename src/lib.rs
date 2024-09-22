@@ -19,6 +19,7 @@ mod stmt;
 mod token;
 mod utils;
 mod value;
+mod class;
 
 static mut HAD_RUNTIME_ERROR: bool = false;
 

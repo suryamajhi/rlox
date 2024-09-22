@@ -1,6 +1,7 @@
 use crate::function::{Function, NativeFunction};
 use std::fmt;
 use std::fmt::Formatter;
+use crate::class::{Class, ClassInstance, ClassInstanceRef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -9,6 +10,8 @@ pub enum Value {
     String(String),
     Function(Function),
     NativeFunction(NativeFunction),
+    Class(Class),
+    ClassInstance(ClassInstanceRef),
     Nil,
 }
 
@@ -21,6 +24,8 @@ impl fmt::Display for Value {
             Value::Nil => String::from("nil"),
             Value::Function(func) => format!("{}", func),
             Value::NativeFunction(_) => "<native fn>".to_string(),
+            Value::Class(class) => format!("{}", class),
+            Value::ClassInstance(instance) => format!("{}", instance.borrow().to_string()),
         };
         write!(f, "{}", s)
     }

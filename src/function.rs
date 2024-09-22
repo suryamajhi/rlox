@@ -5,6 +5,7 @@ use crate::value::Value;
 use crate::Exception;
 use std::fmt;
 use std::fmt::Formatter;
+use crate::class::{ClassInstance, ClassInstanceRef};
 
 pub trait Callable {
     fn arity(&self) -> usize;
@@ -31,14 +32,22 @@ impl Callable for NativeFunction {
 pub struct Function {
     declaration: Stmt,
     closure: EnvRef,
+    is_initializer: bool,
 }
 
 impl Function {
-    pub fn new(declaration: Stmt, closure: EnvRef) -> Self {
+    pub fn new(declaration: Stmt, closure: EnvRef, is_initializer: bool) -> Self {
         Function {
             declaration,
             closure,
+            is_initializer
         }
+    }
+
+    pub fn bind(&mut self, instance: ClassInstanceRef) -> Function {
+        let environment  = Environment::new_local(&self.closure);
+        environment.borrow_mut().define(String::from("this"), Value::ClassInstance(instance));
+        Function::new(self.declaration.clone(), environment, false)
     }
 }
 
@@ -62,10 +71,20 @@ impl Callable for Function {
             if let Err(exception) = interpreter.execute_block(body, environment) {
                 return match exception {
                     Exception::RuntimeError(e) => Err(Exception::RuntimeError(e)),
-                    Exception::Return(value) => Ok(value),
+                    Exception::Return(value) => {
+                        if self.is_initializer {
+                            return self.closure.borrow().get_at(0, "this");
+                        }
+                        return Ok(value);
+                    },
                 };
             }
         }
+
+        if self.is_initializer {
+            return self.closure.borrow().get_at(0, "this");
+        }
+
         Ok(Value::Nil)
     }
 }
