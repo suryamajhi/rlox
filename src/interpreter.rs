@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{Exception, expr, stmt};
+use crate::{Exception, expr, RuntimeError, stmt};
 use crate::environment::{Environment, EnvRef};
 use crate::expr::Expr;
 use crate::function::{Callable, Function, NativeFunction};
 use crate::stmt::Stmt;
 use crate::token::{Literal, Token, TokenType};
 use crate::value::Value;
+use crate::class::Class;
 
 type Result<T> = std::result::Result<T, Exception>;
 
@@ -316,6 +317,19 @@ impl Interpreter {
                 }
                 return func.call(self, args);
             }
+            Value::Class(class) => {
+                if arguments.len() != class.arity() {
+                    return Exception::runtime_error(
+                        paren.clone(),
+                        format!(
+                            "Expected {} arguments but got {}.",
+                            class.arity(),
+                            arguments.len()
+                        ),
+                    );
+                }
+                return class.call(self, args);
+            }
             _ => Exception::runtime_error(
                 paren.clone(),
                 "Can only call functions and classes.".to_string(),
@@ -324,7 +338,7 @@ impl Interpreter {
     }
 
     fn visit_function_stmt(&mut self, name: &Token, function_stmt: &Stmt) -> Result<()> {
-        let function = Function::new(function_stmt.clone(), self.environment.clone());
+        let function = Function::new(function_stmt.clone(), self.environment.clone(), false);
         self.environment
             .borrow_mut()
             .define(name.lexeme.clone(), Value::Function(function));
@@ -336,6 +350,55 @@ impl Interpreter {
             None => Err(Exception::Return(Value::Nil)),
             Some(expr) => Err(Exception::Return(self.evaluate(expr)?)),
         }
+    }
+
+    fn visit_class_stmt(&mut self, name: &Token, methods: &Vec<Stmt>) -> Result<()> {
+        self.environment.borrow_mut().define(name.lexeme.clone(), Value::Nil);
+
+        let mut class_methods = HashMap::new();
+        for method in methods {
+            match method {
+                Stmt::Function {name, body, params} => {
+                    let func = Function::new(method.clone(), self.environment.clone(), name.lexeme == "init");
+                    class_methods.insert(name.lexeme.clone(), func);
+                }
+                _ => {}
+            }
+        }
+
+
+        let klass = Value::Class(Class::new(name.lexeme.clone(), class_methods));
+        self.environment.borrow_mut().assign(name, klass)
+    }
+
+    fn visit_get_expr(&mut self, name: &Token, object: &Expr) -> Result<Value> {
+        let obj = self.evaluate(object)?;
+        if let Value::ClassInstance(class_instance) = obj {
+            let instance_ref = class_instance.clone();
+            return class_instance.borrow().get(name, instance_ref);
+        }
+        Err(Exception::RuntimeError(RuntimeError {
+            token: name.clone(),
+            message: "Only instances have properties".to_string()
+        }))
+    }
+
+    fn visit_set_expr(&mut self, object: &Expr, name: &Token, value: &Expr) -> Result<Value> {
+        let obj = self.evaluate(object)?;
+
+        if let Value::ClassInstance(mut instance) = obj {
+            let value = self.evaluate(value)?;
+            instance.borrow_mut().set(name, value.clone());
+            return Ok(value);
+        }
+        Err(Exception::RuntimeError(RuntimeError {
+            token: name.clone(),
+            message: "Only instance have fields".to_string()
+        }))
+    }
+
+    fn visit_this_expr(&mut self, keyword: &Token, expr: &Expr) -> Result<Value> {
+        self.lookup_variable(keyword, expr)
     }
 }
 
@@ -367,6 +430,9 @@ impl expr::Visitor<Result<Value>> for Interpreter {
                 arguments,
                 ..
             } => self.visit_call_expr(callee, paren, arguments),
+            Expr::Get {name, object,..} => self.visit_get_expr(name, object),
+            Expr::Set {object, name, value, ..} => self.visit_set_expr(object, name, value),
+            Expr::This {keyword, ..} => self.visit_this_expr(keyword, expr),
         }
     }
 }
@@ -386,6 +452,7 @@ impl stmt::Visitor<Result<()>> for Interpreter {
             Stmt::While { condition, body } => self.visit_while_stmt(condition, body),
             Stmt::Function { name, .. } => self.visit_function_stmt(name, stmt),
             Stmt::Return { keyword: _keyword, value } => self.visit_return_stmt(value),
+            Stmt::Class {name, methods} => self.visit_class_stmt(name, methods),
         }
     }
 }

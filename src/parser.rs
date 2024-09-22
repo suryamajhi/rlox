@@ -44,7 +44,9 @@ impl<'a> Parser<'a> {
 
     fn declaration(&mut self) -> Option<Stmt> {
         let res;
-        if self.match_token(vec![FUN]) {
+        if self.match_token(vec![CLASS]) {
+            res = self.class_declaration();
+        } else if self.match_token(vec![FUN]) {
             res = self.function("function");
         } else if self.match_token(vec![VAR]) {
             res = self.var_declaration();
@@ -55,6 +57,23 @@ impl<'a> Parser<'a> {
             Ok(stmt) => Some(stmt),
             Err(_) => None,
         }
+    }
+
+    fn class_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume(IDENTIFIER, "Expect class name")?.clone();
+        self.consume(LEFT_BRACE, "Expect '{' before class body");
+
+        let mut methods = Vec::new();
+        while !self.check(&RIGHT_BRACE) && !self.is_at_end() {
+            methods.push(self.function("method")?);
+        }
+
+        self.consume(RIGHT_BRACE, "Expect '}' after class body.")?;
+
+        Ok(Stmt::Class {
+            name,
+            methods
+        })
     }
 
     fn function(&mut self, kind: &str) -> Result<Stmt> {
@@ -277,6 +296,14 @@ impl<'a> Parser<'a> {
                     value: Box::new(value),
                 });
             }
+            if let Expr::Get {name, object,..} = expr {
+                return Ok(Expr::Set {
+                    uid: next_id(),
+                    name,
+                    object,
+                    value: Box::new(value)
+                });
+            }
             return Err(self.error(&equals, "Invalid assignment target"));
         }
         Ok(expr)
@@ -365,6 +392,9 @@ impl<'a> Parser<'a> {
         loop {
             if self.match_token(vec![LEFT_PAREN]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_token(vec![DOT]) {
+                let name = self.consume(IDENTIFIER, "Expect property name after .")?.clone();
+                expr = Expr::Get { uid: next_id(), name, object: Box::new(expr)}
             } else {
                 break;
             }
@@ -416,6 +446,12 @@ impl<'a> Parser<'a> {
                 uid: next_id(),
                 value: self.previous().literal.clone(),
             });
+        }
+        if self.match_token(vec![THIS]) {
+            return Ok(Expr::This {
+                uid: next_id(),
+                keyword: self.previous().clone()
+            })
         }
         if self.match_token(vec![IDENTIFIER]) {
             return Ok(Expr::Var {
